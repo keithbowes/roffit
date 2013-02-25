@@ -354,7 +354,7 @@ sub parsefile {
                 $rest =~ s/>/&gt;/g;
                 
                 $indentlevel-- if ($indentlevel);
-                push @p, "<a name=\"$name\"></a><span class=\"nroffip\">$rest</span> ";
+                push @p, "<span class=\"nroffip\" id=\"$name\">$rest</span> ";
                 # make this a single-line title
                 showp(@p);
                 @p="";
