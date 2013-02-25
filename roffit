@@ -32,6 +32,9 @@ my %anchor; # hash with all anchors
 my $mandir;
 my $hrefdir=".";
 
+my $encoding = "";
+my $homepage = "https://github.com/keithbowes/roffit";
+
 while($ARGV[0]) {
     if($ARGV[0] eq "--bare") {
         # don't include headers and stuff
@@ -39,7 +42,7 @@ while($ARGV[0]) {
         shift @ARGV;
     }
     elsif($ARGV[0] eq "--version") {
-        print "roffit $version (http://daniel.haxx.se/projects/roffit/)\n";
+        print "roffit $version ($homepage)\n";
         exit;
     }
     elsif($ARGV[0] =~ /^--mandir=(.*)/) {
@@ -401,7 +404,7 @@ sub parsefile {
                 # We don't support this
                 push @out, "See the $rest man page.\n";
             }
-            elsif($keyword =~ /^BR$/) {
+            elsif($keyword =~ /^BR$/i) {
                 # I'm not sure what this does exactly, but this is commonly
                 # used to include pointers to other man pages. Let's assume
                 # it only does that for now.
@@ -432,6 +435,12 @@ sub parsefile {
                     }
                 }
             }
+            elsif($keyword =~ /^encoding/i) {
+              if (!$encoding) {
+                $rest = /(encoding)\s*(.+)/i;
+                $encoding = $2;
+              }
+            }
             else {
                 showp(@p);
                 @p="";
@@ -452,6 +461,7 @@ sub parsefile {
             $txt =~ s/\\ /&nbsp\;/g;
             $txt =~ s/\\\'/&acute\;/g;
             $txt =~ s/\\\(co/&copy\;/g;
+            $txt =~ s/\\"(.*)$/<!-- $1 -->/g;
 
             # replace backslash [something] with just [something]
             $txt =~ s/\\(.)/$1/g;
@@ -486,13 +496,18 @@ my @conv = linkfile();
 my $title=sprintf("%s man page",
                   $manpage{'name'}?$manpage{'name'}:"secret");
 
+if (!$encoding) {
+  $encoding = 'utf-8';
+}
+
 if($standalone) {
     print $OutFH <<MOO
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
  "http://www.w3.org/TR/html4/loose.dtd">
 <html><head>
 <title>$title</title>
-<meta name="generator" content="roffit">
+<meta name="generator" content="roffit-$version">
+<meta http-equiv="Content-type" content="text/html; charset=$encoding">
 MOO
     ;
     defaultcss();
@@ -505,7 +520,7 @@ else {
 print $OutFH @conv;
 print $OutFH <<ROFFIT
 <p class="roffit">
- This HTML page was made with <a href="http://daniel.haxx.se/projects/roffit/">roffit</a>.
+ This HTML page was made with <a href="$homepage">roffit $version</a>.
 ROFFIT
     ;
 
