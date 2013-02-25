@@ -72,21 +72,21 @@ while($ARGV[0]) {
 sub showp {
     my @p = @_;
     push @out, "\n" if(!$pre);
-    push @out, "<p class=\"level$indentlevel\">", @p;
+    push @out, "<div class=\"level$indentlevel\">", @p, "</div>";
 }
 
 sub defaultcss {
     print $OutFH <<ENDOFCSS
-<STYLE type="text/css">
-P.level0 {
+<style type="text/css">
+div.level0 {
  padding-left: 2em;
 }
 
-P.level1 {
+div.level1 {
  padding-left: 4em;
 }
 
-P.level2 {
+div.level2 {
  padding-left: 6em;
 }
 
@@ -116,7 +116,7 @@ p.roffit {
  text-align: center;
  font-size: 80%;
 }
-</STYLE>
+</style>
 ENDOFCSS
     ;
 }
@@ -285,7 +285,7 @@ sub parsefile {
                 $rest =~ s/\"//g; # cut off quotes
                 $rest =~ s/</&lt;/g;
                 $rest =~ s/>/&gt;/g;
-                $out = "<a name=\"$name\"></a><h2 class=\"nroffsh\">$rest</h2>";
+                $out = "<h2 class=\"nroffsh\" id=\"$name\">$rest</h2>";
                 $indentlevel=0;
                 $within_tp=0;
             }
@@ -435,6 +435,37 @@ sub parsefile {
                     }
                 }
             }
+            elsif ($keyword =~ /P/) {
+                # I'm not sure what this does exactly, but this is commonly
+                # used to include pointers to other man pages. Let's assume
+                # it only does that for now.
+                # blabla (3)
+                # or "blabla (3)"
+                # or strcmp "(3), " strcasecmp "(3)"
+                # etc
+                
+                $rest =~ s/\"//g; # cut off quotes
+                $rest =~ s/</&lt;/g;
+                $rest =~ s/>/&gt;/g;
+
+                if(!$rest) {
+                    # A stand-alone .br will become a line break
+                    #print $debugFH "ALERT: bare BR\n";
+                    push @p, "<p/>";
+                }
+                else {
+                    my @all = split /,/, $rest;
+                    for(@all) {
+                        if(/([^ ]*) *\((\d+)\)/) {
+                            # TODO: this looks like a man page, check if
+                            # there's a HTML file for it and if so make a link
+                            # to it
+                        }
+                        
+                        push @p, "<p class=\"manpage\">$_</p> ";
+                    }
+                }
+            }
             elsif($keyword =~ /^encoding/i) {
               if (!$encoding) {
                 $rest = /(encoding)\s*(.+)/i;
@@ -511,7 +542,7 @@ if($standalone) {
 MOO
     ;
     defaultcss();
-    print "</head><body>\n";
+    print "</head><body>\n<h1>$title</h1>\n";
 }
 else {
     print "<!-- generated with roffit -->\n";
@@ -519,8 +550,9 @@ else {
 
 print $OutFH @conv;
 print $OutFH <<ROFFIT
-<p class="roffit">
+<div> class="roffit">
  This HTML page was made with <a href="$homepage">roffit $version</a>.
+</div>
 ROFFIT
     ;
 
