@@ -550,7 +550,7 @@ else {
 
 print $OutFH @conv;
 print $OutFH <<ROFFIT
-<div> class="roffit">
+<div class="roffit">
  This HTML page was made with <a href="$homepage">roffit $version</a>.
 </div>
 ROFFIT
