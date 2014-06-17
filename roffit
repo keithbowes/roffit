@@ -269,7 +269,7 @@ sub parsefile {
                     $manpage{'section'} = $2;
 		}
             }
-            elsif($keyword =~ /^S[HS]$/) {
+            elsif($keyword =~ /^S[HS]$/i) {
                 # SS is treated the same as SH
                 # Section Header
                 showp(@p);
@@ -289,7 +289,7 @@ sub parsefile {
                 $indentlevel=0;
                 $within_tp=0;
             }
-            elsif(($keyword =~ /^B$/) || ($keyword =~ /^BI$/)) {
+            elsif(($keyword =~ /^B$/i) || ($keyword =~ /^BI$/i)) {
                 # Make B and BI the same for simplicity
                 $rest =~ s/\"//g; # cut off quotes
                 $rest =~ s/</&lt;/g;
@@ -305,26 +305,26 @@ sub parsefile {
                     push @p, "\n";
                 }
             }
-            elsif(($keyword =~ /^I$/) || ($keyword =~ /^IR$/)) {
+            elsif(($keyword =~ /^I$/i) || ($keyword =~ /^IR$/i)) {
                 $rest =~ s/\"//g; # cut off quotes
                 $rest =~ s/</&lt;/g;
                 $rest =~ s/>/&gt;/g;
                 push @p, "<span class=\"emphasis\">$rest</span> ";
             }
-            elsif($keyword =~ /^RS$/) {
+            elsif($keyword =~ /^RS$/i) {
                 # the start of another indent-level. for inlined tables
                 # within an "IP"
                 showp(@p);
                 @p="";
                 $indentlevel++;
             }
-            elsif($keyword =~ /^RE$/) {
+            elsif($keyword =~ /^RE$/i) {
                 # end of the RS section
                 showp(@p);
                 @p="";
                 $indentlevel--;
             }
-            elsif($keyword =~ /^NF$/) {
+            elsif($keyword =~ /^NF$/i) {
                 # We let nf start a <pre> section .nf = no-fill, you use for
                 # graphs or text that you don't want spaces to be ignored
 
@@ -333,7 +333,7 @@ sub parsefile {
                 push @out, "<pre>\n";
                 $pre=1
             }
-            elsif($keyword =~ /^TP$/) {
+            elsif($keyword =~ /^TP$/i) {
                 # Used within an "RS" section to make a new line. The first
                 # TP as a column indicator, but we decide to do that
                 # controlling in the CSS instead.
@@ -341,7 +341,7 @@ sub parsefile {
                 showp(@p);
                 @p="";                
             }
-            elsif($keyword =~ /^IP$/) {
+            elsif($keyword =~ /^IP$/i) {
                 # start of a new paragraph coming up
                 showp(@p);
                 @p="";
@@ -361,27 +361,27 @@ sub parsefile {
                 $indentlevel++;
                 $within_tp=0;
             }
-            elsif($keyword =~ /^ad$/) {
+            elsif($keyword =~ /^ad$/i) {
                 showp(@p);
                 @p="";
             }
-            elsif($keyword =~ /^sp$/) {
+            elsif($keyword =~ /^sp$/i) {
                 showp(@p);
                 @p="";
             }
-            elsif($keyword =~ /^lp$/) {
+            elsif($keyword =~ /^lp$/i) {
                 # marks end of a paragraph
                 showp(@p);
                 @p="";
             }
-            elsif($keyword =~ /^pp$/) {
+            elsif($keyword =~ /^pp$/i) {
                 # PP ends a TP section, but some TP sections don't use it
                 # Often used to separate paragraphs
                 $within_tp=0;
                 showp(@p);
                 @p="";
             }
-            elsif($keyword =~ /^fi$/) {
+            elsif($keyword =~ /^fi$/i) {
                 # .fi = fill-in, extra space will be ignored and text that is
                 # entered like this, the fill-in command will continue until
                 # you enter a .nf command and vice-versa
@@ -395,10 +395,10 @@ sub parsefile {
                 }
 
             }
-            elsif($keyword =~ /^(de|ft|\.)$/) {
+            elsif($keyword =~ /^(de|ft|\.)$/i) {
                 # no idea what these do!
             }
-            elsif($keyword =~ /^so$/) {
+            elsif($keyword =~ /^so$/i) {
                 # This keyword refers to a different man page, named in the
                 # $rest.
                 # We don't support this
