@@ -198,24 +198,34 @@ sub linkfile {
                     $link="<a class=\"$style\" href=\"#$l\">$name</a>";
                 }
                 else {
-                    if(($mandir) &&
-                       ($name =~ /^ *([A-Za-z_0-9-]*) *\( *(\d+[A-Za-z]*) *\) *$/)) {
+                    if($mandir) {
+                        my ($symbol, $section);
+                        if ($name =~ /^ *([A-Za-z_0-9-]*) *\( *(\d+[A-Za-z]*) *\) *$/) {
 
-                        # this looks like a reference to another man page, and
-                        # we have asked for this feature! We check for the
-                        # specified nroff file and not the HTML version, to
-                        # avoid depending on which order the set of files are
-                        # converted to HTML!
-                        my ($symbol, $section)=($1, lc $2);
-                        for my $d (@mandirs) {
-                            my $file = "$d/$symbol.$section";
+                            # this looks like a reference to another man page, and
+                            # we have asked for this feature! We check for the
+                            # specified nroff file and not the HTML version, to
+                            # avoid depending on which order the set of files are
+                            # converted to HTML!
+                            ($symbol, $section)=($1, lc $2);
+                        }
+                        elsif ($field =~ /\[\] *\( *(\d+[A-Za-z]*) *\)/) {
+                            # Also look for references where the man page
+                            # section is outside the span.
+                            $section = lc $1;
+                            ($symbol) = ($name =~ /^ *([A-Za-z_0-9-]+)/);
+                        }
+                        if ($symbol && $section) {
+                            for my $d (@mandirs) {
+                                my $file = "$d/$symbol.$section";
 
-                            if(-r $file) {
-                                my $html = "$hrefdir/$symbol.html";
-                                # there is such a HTML file present, produce a
-                                # link to it!
-                                $link = "<a Class=\"$style\" href=\"$html\">$symbol</a>";
-                                last; # skip out of loop
+                                if(-r $file) {
+                                    my $html = "$hrefdir/$symbol.html";
+                                    # there is such a HTML file present, produce a
+                                    # link to it!
+                                    $link = "<a Class=\"$style\" href=\"$html\">$symbol</a>";
+                                    last; # skip out of loop
+                                }
                             }
                         }
                     }
@@ -247,6 +257,36 @@ sub handle_italic_bold ($) {
     return $_;
 }
 
+sub split_quoted ($) {
+    my $t = shift;
+    my @tokens;
+    my $quoted=0;
+    for my $chunk (split /(?<![^\\]\\)"/, $t) {
+        if ($quoted) {
+            # "text in quotes" don't split
+            push @tokens, $chunk;
+        }
+        else {
+            # Outside of quotes, split on whitespace
+            push @tokens, split(' ', $chunk);
+        }
+        $quoted = not $quoted;
+    }
+    return @tokens;
+}
+
+my %apply_face = (
+    I => sub {
+        return sprintf('<span class="emphasis">%s</span>', shift);
+    },
+    B => sub {
+        return sprintf('<span class="bold">%s</span>', shift);
+    },
+    R => sub {
+        return shift;
+    }
+);
+
 sub parsefile {
     my ($filename)=@_;
     my $lineno;
@@ -260,7 +300,7 @@ sub parsefile {
 
         $in =~ s/[\r\n]//g if(!$pre); # tear off newlines
 
-        $in =~ s/\r//g; # remote carriage return always
+        $in =~ s/\r//g; # remove carriage return always
 
         # substitue all '\-' sequences with '-'.
         # '\-' might be in the source file to specify a literal
@@ -352,8 +392,7 @@ sub parsefile {
                 $indentlevel=0;
                 $within_tp=0;
             }
-            elsif(($keyword =~ /^B$/i) || ($keyword =~ /^BI$/i)) {
-                # Make B and BI the same for simplicity
+            elsif($keyword =~ /^B$/i) {
                 $rest =~ s/\"//g; # cut off quotes
                 $rest = do_encode($rest);
 
@@ -367,7 +406,7 @@ sub parsefile {
                     push @p, "\n";
                 }
             }
-            elsif(($keyword =~ /^I$/i) || ($keyword =~ /^IR$/i)) {
+            elsif($keyword =~ /^I$/i) {
                 $rest =~ s/\"//g; # cut off quotes
                 $rest = do_encode($rest);
                 push @p, "<span class=\"emphasis\">$rest</span> ";
@@ -391,8 +430,11 @@ sub parsefile {
 
                 showp(@p);
                 @p="";
-                push @out, "<pre class=\"level$indentlevel\">\n";
-                $pre=1
+                if (!$pre) {
+                    # avoid nesting pre sections
+                    push @out, "<pre class=\"level$indentlevel\">\n";
+                    $pre=1
+                }
             }
             elsif($keyword =~ /^TP$/i) {
                 # Used within an "RS" section to make a new line. The first
@@ -411,6 +453,7 @@ sub parsefile {
                 $anchor{$name}=1;
 
                 $rest =~ s/\"//g; # cut off quotes
+		$rest =~ s/\\f[IBPR]//g; # Un-format it (Use CSS on nroffip class instead)
                 $rest = do_encode($rest);
                 
                 $indentlevel-- if ($indentlevel);
@@ -464,56 +507,24 @@ sub parsefile {
                 # We don't support this
                 push @out, "See the $rest man page.\n";
             }
-            elsif($keyword =~ /^BR$/i) {
-                # I'm not sure what this does exactly, but this is commonly
-                # used to include pointers to other man pages. Let's assume
-                # it only does that for now.
-                # blabla (3)
-                # or "blabla (3)"
-                # or strcmp "(3), " strcasecmp "(3)"
-                # etc
-                
-                $rest =~ s/\"//g; # cut off quotes
-                $rest = do_encode($rest);
-                $rest =~ s/^\s+//;
-                $rest =~ s/\s+$//;
+	    elsif($keyword eq "br") {
+                push @p, "<br>";
+	    }
+            elsif($keyword =~ /^([RIB])([RIB])$/) {
+                # Alternating font faces
+                my @ff = ($1, $2);
 
-                if(!$rest) {
-                    # A stand-alone .br will become a line break
-                    #print $debugFH "ALERT: bare BR\n";
-                    push @p, "<br>";
-                }
-                else {
-                    my @all = split /\s*,\s*/, $rest;
+                if($rest) {
+                    my @all = split_quoted($rest);
+                    my $fi = 0;
+                    my @applied;
                     for(@all) {
-                        my $link = "<span class=\"manpage\">$_</span>";
-                        if(/([A-Za-z_0-9-]*) *\( *(\d+[A-Za-z]*) *\)/) {
-                            my ($symbol, $section)=($1, lc $2);
-
-                            for my $d (@mandirs) {
-                                my $file = "$d/$symbol.$section";
-
-                                if(-r $file) {
-                                    my $html = "$hrefdir/$symbol.html";
-                                    # there is such a HTML file present, produce a link
-                                    # to it!
-                                    $link = "<a Class=\"manpage\" href=\"$html\">$symbol</a>";
-                                    last; # skip out of loop
-                                }
-                            }
-                        }
-
-                        # if we're continuing an existing list use a comma
-                        # .BR foo (or .BR foo,)
-                        # .BR bar
-                        # will render as foo, bar
-                        if($br_lastp && @p == $br_lastp) {
-                            $link = ", " . $link;
-                        }
-
-                        push @p, $link;
-                        $br_lastp = @p;
+                        my $encoded = do_encode($_);
+                        push @applied, $apply_face{$ff[$fi]}->($encoded);
+                        $fi = $fi ? 0 : 1;
                     }
+                    push @applied, " ";
+                    push @p, join("", @applied);
                 }
             }
             elsif ($keyword =~ /^ti/i) {
@@ -530,8 +541,6 @@ sub parsefile {
             # text line, decode \-stuff
             my $txt = $in;
 
-            $txt = handle_italic_bold $txt;
-
             $txt =~ s/\\&//g;
 	    # Must come after previous substitution or it could munge some entities.
 	    $txt = do_encode($txt);
@@ -540,6 +549,8 @@ sub parsefile {
             $txt =~ s/\\(?:'|&#39;)/&acute\;/g;
             $txt =~ s/\\\(co/&copy\;/g;
             $txt =~ s/\\"(.*)$/<!-- $1 -->/g;
+
+            $txt = handle_italic_bold $txt;
 
             # replace backslash [something] with just [something]
             $txt =~ s/\\(.)/$1/g;
